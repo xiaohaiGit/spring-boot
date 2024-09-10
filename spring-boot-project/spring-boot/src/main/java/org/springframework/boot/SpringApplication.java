@@ -258,17 +258,33 @@ public class SpringApplication {
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
+		// 通常使用情况是，我们这里并不会设置resourceLoader
 		this.resourceLoader = resourceLoader;
 		Assert.notNull(primarySources, "PrimarySources must not be null");
 		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
+
+		//从类路径推断应用类型，判断出类型收，保存到成员变量中，提供给后续创建其它的实例的时候，来判断
+		//应该创建什么类型的实例
 		this.webApplicationType = WebApplicationType.deduceFromClasspath();
+
+		//BootstrapRegistryInitializer 官方没有直接提供子类，需要我们根据自己的需求来创建
 		this.bootstrapRegistryInitializers = new ArrayList<>(
 				getSpringFactoriesInstances(BootstrapRegistryInitializer.class));
+
+		//ApplicationContextInitializer 在spring-boot 和 spring-boot-autoconfigure 的META-INF/spring.factories 文件中有配置具体的子类
 		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+
+		//ApplicationListener 在spring-boot 和 spring-boot-autoconfigure 的META-INF/spring.factories 文件中有配置具体的子类
 		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+
+		// 推断主应用程序类 ，因为主类的位置和主类上的注解，需要被后续解析，来完成各项初始化操作
 		this.mainApplicationClass = deduceMainApplicationClass();
 	}
 
+	/**
+	 * 通过遍历运行时的堆栈，来找到含有main方法的元素，以此来确定应用程序的主类
+	 * @return 应用程序主类 Class
+	 */
 	private Class<?> deduceMainApplicationClass() {
 		try {
 			StackTraceElement[] stackTrace = new RuntimeException().getStackTrace();
