@@ -307,19 +307,47 @@ public class SpringApplication {
 	 * @return a running {@link ApplicationContext}
 	 */
 	public ConfigurableApplicationContext run(String... args) {
+		// 获取当前时间，作为应用程序开始时间
 		long startTime = System.nanoTime();
+
+		// 创建启动上下文
 		DefaultBootstrapContext bootstrapContext = createBootstrapContext();
+
 		ConfigurableApplicationContext context = null;
+
+		// 配置无头模式,通过系统属性java.awt.headless 来配置，默认不配置的值为：true
+		// 做服务器开发，一般程序都运行在没有界面的服务器上，所以这里可以忽略
 		configureHeadlessProperty();
+
+		// 通过SpringFactoriesLoader工具 获取在META-INF/spring.factories 中配置的
+		// SpringApplicationRunListener接口的所有子类并实例化，然后封装到
+		// SpringApplicationRunListeners 类的实例中，并返回SpringApplicationRunListeners对象
 		SpringApplicationRunListeners listeners = getRunListeners(args);
+
+		//
 		listeners.starting(bootstrapContext, this.mainApplicationClass);
 		try {
+
+			// 创建DefaultApplicationArguments对象，用来解析命令行参数，
+			// 并创建CommandLinePropertySource 对象，存储在DefaultApplicationArguments对象中
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+
+			//
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, bootstrapContext, applicationArguments);
 			configureIgnoreBeanInfo(environment);
+
+			// 打印banner, 并返回banner实例
 			Banner printedBanner = printBanner(environment);
+
+			// 创建应用上下文，上下文有两种，servlet 和 reactive，根据 webApplicationType 的值来创建对应的类型
+			// servlet :   AnnotationConfigServletWebServerApplicationContext
+			// reactive :  AnnotationConfigReactiveWebServerApplicationContext
 			context = createApplicationContext();
+
+			// 设置 ApplicationStartup
 			context.setApplicationStartup(this.applicationStartup);
+
+			//
 			prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
 			refreshContext(context);
 			afterRefresh(context, applicationArguments);
@@ -354,8 +382,12 @@ public class SpringApplication {
 	private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
 			DefaultBootstrapContext bootstrapContext, ApplicationArguments applicationArguments) {
 		// Create and configure the environment
+
+		// 根据应用类型，创建环境对象
 		ConfigurableEnvironment environment = getOrCreateEnvironment();
+		// 配置环境
 		configureEnvironment(environment, applicationArguments.getSourceArgs());
+		// 添加 ConfigurationPropertySourcesPropertySource 属性源头，顺序在第一位
 		ConfigurationPropertySources.attach(environment);
 		listeners.environmentPrepared(bootstrapContext, environment);
 		DefaultPropertiesPropertySource.moveToEnd(environment);
@@ -385,21 +417,40 @@ public class SpringApplication {
 	private void prepareContext(DefaultBootstrapContext bootstrapContext, ConfigurableApplicationContext context,
 			ConfigurableEnvironment environment, SpringApplicationRunListeners listeners,
 			ApplicationArguments applicationArguments, Banner printedBanner) {
+
+		// 给上下文对象设置 ConfigurableEnvironment 对象
 		context.setEnvironment(environment);
+
+		// 做一些配置
 		postProcessApplicationContext(context);
+
+		// 对上下文对象应用初始化器 , 框架默认的初始化器，配置在 spring.factories 文件中，
+		// 我们也可以手动通过代码的方式添加，或者在自己添加一个 spring.factories 文件
 		applyInitializers(context);
+
+		// 执行监听器的 contextPrepared 方法
 		listeners.contextPrepared(context);
+
+		// 关闭启动上下文
 		bootstrapContext.close(context);
+
 		if (this.logStartupInfo) {
 			logStartupInfo(context.getParent() == null);
 			logStartupProfileInfo(context);
 		}
+
 		// Add boot specific singleton beans
+		// 获取 beanFactory
 		ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
+		// 注册 springApplicationArguments 单例对象
 		beanFactory.registerSingleton("springApplicationArguments", applicationArguments);
+
+		// 注册 springBootBanner 单例对象
 		if (printedBanner != null) {
 			beanFactory.registerSingleton("springBootBanner", printedBanner);
 		}
+
+
 		if (beanFactory instanceof AbstractAutowireCapableBeanFactory) {
 			((AbstractAutowireCapableBeanFactory) beanFactory).setAllowCircularReferences(this.allowCircularReferences);
 			if (beanFactory instanceof DefaultListableBeanFactory) {
@@ -407,6 +458,8 @@ public class SpringApplication {
 					.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
 			}
 		}
+
+		// 添加 BeanFactoryPostProcessor
 		if (this.lazyInitialization) {
 			context.addBeanFactoryPostProcessor(new LazyInitializationBeanFactoryPostProcessor());
 		}
@@ -492,10 +545,15 @@ public class SpringApplication {
 	 * @see #configurePropertySources(ConfigurableEnvironment, String[])
 	 */
 	protected void configureEnvironment(ConfigurableEnvironment environment, String[] args) {
+
+		// 默认为 ：addConversionService 为 true , 创建 ApplicationConversionService
 		if (this.addConversionService) {
 			environment.setConversionService(new ApplicationConversionService());
 		}
+
+		// 增加命令行属性源
 		configurePropertySources(environment, args);
+		// 此函数的方法体为空，空执行
 		configureProfiles(environment, args);
 	}
 
@@ -508,9 +566,12 @@ public class SpringApplication {
 	 */
 	protected void configurePropertySources(ConfigurableEnvironment environment, String[] args) {
 		MutablePropertySources sources = environment.getPropertySources();
+		// defaultProperties 默认情况下是null，可通过SpringApplicationBuilder 的方式来配置
 		if (!CollectionUtils.isEmpty(this.defaultProperties)) {
 			DefaultPropertiesPropertySource.addOrMerge(this.defaultProperties, sources);
 		}
+
+		// 配置了命令行参数的情况下，进入
 		if (this.addCommandLineProperties && args.length > 0) {
 			String name = CommandLinePropertySource.COMMAND_LINE_PROPERTY_SOURCE_NAME;
 			if (sources.contains(name)) {
@@ -522,6 +583,8 @@ public class SpringApplication {
 				sources.replace(name, composite);
 			}
 			else {
+				// 往MutablePropertySources 添加命令行属性源，并将此属性源放到第一位置
+				// 也就是说，通过命令行设置的属性配置的优先级是最高的
 				sources.addFirst(new SimpleCommandLinePropertySource(args));
 			}
 		}
@@ -680,16 +743,28 @@ public class SpringApplication {
 		if (logger.isDebugEnabled()) {
 			logger.debug("Loading source " + StringUtils.arrayToCommaDelimitedString(sources));
 		}
+
+		// 创建 BeanDefinitionLoader
 		BeanDefinitionLoader loader = createBeanDefinitionLoader(getBeanDefinitionRegistry(context), sources);
+
+		// 设置相关属性
+
+		// 默认 null , 不执行
 		if (this.beanNameGenerator != null) {
 			loader.setBeanNameGenerator(this.beanNameGenerator);
 		}
+
+		// 默认 null , 不执行
 		if (this.resourceLoader != null) {
 			loader.setResourceLoader(this.resourceLoader);
 		}
+
+		// 默认 null , 不执行
 		if (this.environment != null) {
 			loader.setEnvironment(this.environment);
 		}
+
+		// 执行load , 加载bean 到应用上下文
 		loader.load();
 	}
 
