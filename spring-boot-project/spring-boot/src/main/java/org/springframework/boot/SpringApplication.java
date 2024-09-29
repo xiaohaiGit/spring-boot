@@ -332,8 +332,10 @@ public class SpringApplication {
 			// 并创建CommandLinePropertySource 对象，存储在DefaultApplicationArguments对象中
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
 
-			//
+			// 准备环境，包含环境的创建，配置等
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, bootstrapContext, applicationArguments);
+
+			// 配置是否忽略 beaninfo ,默认值为：true ，此项配置对性能等有影响
 			configureIgnoreBeanInfo(environment);
 
 			// 打印banner, 并返回banner实例
@@ -347,15 +349,27 @@ public class SpringApplication {
 			// 设置 ApplicationStartup
 			context.setApplicationStartup(this.applicationStartup);
 
-			//
+			//准备上下文
 			prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
+
+			// 刷新上下文
 			refreshContext(context);
+
+			// 方法体为空，子类可以实现
 			afterRefresh(context, applicationArguments);
+
+			// 记录启动花费的时间
 			Duration timeTakenToStartup = Duration.ofNanos(System.nanoTime() - startTime);
+
+			// 打印 Started 信息，包含启动耗时
 			if (this.logStartupInfo) {
 				new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), timeTakenToStartup);
 			}
+
+			//上下文已刷新，应用程序已启动，但尚未调
 			listeners.started(context, timeTakenToStartup);
+
+			// 调用 ApplicationRunner 和 CommandLineRunner 接口的实现 bean
 			callRunners(context, applicationArguments);
 		}
 		catch (Throwable ex) {
@@ -434,8 +448,13 @@ public class SpringApplication {
 		// 关闭启动上下文
 		bootstrapContext.close(context);
 
+		// logStartupInfo 的值默认为true , 默认进入该方法
 		if (this.logStartupInfo) {
+
+			// 打印 Starting 信息
 			logStartupInfo(context.getParent() == null);
+
+			// 打印激活的配置数量和名称
 			logStartupProfileInfo(context);
 		}
 
@@ -467,7 +486,11 @@ public class SpringApplication {
 		// Load the sources
 		Set<Object> sources = getAllSources();
 		Assert.notEmpty(sources, "Sources must not be empty");
+
+		// 加载 beans 到应用上下文
 		load(context, sources.toArray(new Object[0]));
+
+		// 上下文加载：给上下文对象设置 应用监听器，并广播事件
 		listeners.contextLoaded(context);
 	}
 

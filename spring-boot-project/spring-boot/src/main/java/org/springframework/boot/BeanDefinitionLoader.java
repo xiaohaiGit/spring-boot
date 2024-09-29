@@ -135,6 +135,7 @@ class BeanDefinitionLoader {
 	 * Load the sources into the reader.
 	 */
 	void load() {
+		// 通常我们使用的情况，sources 只有我们main 函数所在的类，除非我们手动添加source
 		for (Object source : this.sources) {
 			load(source);
 		}
@@ -142,6 +143,8 @@ class BeanDefinitionLoader {
 
 	private void load(Object source) {
 		Assert.notNull(source, "Source must not be null");
+
+		// 通常默认情况下进入这个 if 分支
 		if (source instanceof Class<?>) {
 			load((Class<?>) source);
 			return;
@@ -162,11 +165,17 @@ class BeanDefinitionLoader {
 	}
 
 	private void load(Class<?> source) {
+
+		// 用java 编程 ，则忽略
+		// 用 groovy 编程，进入该if分支
 		if (isGroovyPresent() && GroovyBeanDefinitionSource.class.isAssignableFrom(source)) {
 			// Any GroovyLoaders added in beans{} DSL can contribute beans here
 			GroovyBeanDefinitionSource loader = BeanUtils.instantiateClass(source, GroovyBeanDefinitionSource.class);
 			((GroovyBeanDefinitionReader) this.groovyReader).beans(loader.getBeans());
 		}
+
+
+		// 检查 source 是否满足注册条件 ， 通常情况下一定会进入，详细请看 isEligible 的三个判断条件
 		if (isEligible(source)) {
 			this.annotatedReader.register(source);
 		}
